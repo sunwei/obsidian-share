@@ -1,0 +1,10 @@
+{
+	"id": "mdfriday-share",
+	"name": "MDFriday Share",
+	"minAppVersion": "1.13.0",
+	"description": "Right-click a note to share a public link. No account, no Git, no setup.",
+	"author": "sunwei",
+	"authorUrl": "https://mdfriday.com",
+	"isDesktopOnly": true,
+	"version": "26.11.0"
+}

@@ -1,0 +1,20 @@
+{
+  "id": "sample-share-note-mw4cxj1o",
+  "name": "sample-share-note",
+  "type": "site",
+  "createdAt": 1793932229297,
+  "updatedAt": 1793932287304,
+  "workspaceId": "workspace-1793932199916-pq2px5juq",
+  "fileLink": {
+    "sourcePath": "/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/Notes/sample-share-note.md",
+    "targetPath": "/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/.obsidian/plugins/mdfriday-share/workspace/projects/sample-share-note/content/index.md",
+    "isSymlink": true
+  },
+  "cloudflare": {
+    "cloudflareProjectId": "p_4585ea946b407a00abf75b5df35c52ca",
+    "hostingMode": "share",
+    "boundAt": 1793932280546,
+    "siteId": "GkeY54",
+    "publicBaseUrl": "https://share.fsky.top"
+  }
+}

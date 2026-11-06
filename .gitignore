@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies & build (repo-root artifacts)
+node_modules/
+/main.js
+/styles.css
+.DS_Store
+.idea
+.eslintcache
+*.tsbuildinfo
+
+# Legacy / accidental root vault
+/.obsidian/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Coverage
+coverage
+.nyc_output
+
+# --- Smoke vault: track structure; ignore secrets & runtime ---
+# Obsidian workspace / cache (regenerated)
+tests/smoke-vault/.obsidian/workspace.json
+tests/smoke-vault/.obsidian/workspace-mobile.json
+tests/smoke-vault/.obsidian/workspaces.json
+tests/smoke-vault/.obsidian/cache/
+tests/smoke-vault/.obsidian/global-graph.json
+tests/smoke-vault/.obsidian/graph.json
+tests/smoke-vault/.obsidian/snippets/
+# Credentials / plugin state — never commit
+tests/smoke-vault/.obsidian/plugins/**/data.json
+# Build outputs inside vault (symlinks or copies from root build)
+tests/smoke-vault/.obsidian/plugins/mdfriday-share/main.js
+tests/smoke-vault/.obsidian/plugins/mdfriday-share/styles.css
+# Keep manifest.json tracked as symlink or file after sync — if symlink to root, OK to track;
+# ignore local copy drift of large bundles only (above).

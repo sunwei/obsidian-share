@@ -1,0 +1,44 @@
+{
+  "baseURL": "/s/GkeY54/",
+  "title": "sample-share-note",
+  "contentDir": "content",
+  "publishDir": "public",
+  "defaultContentLanguage": "en",
+  "taxonomies": {
+    "tag": "tags",
+    "category": "categories"
+  },
+  "module": {
+    "imports": [
+      {
+        "path": "https://cdn.fsky.top/t/notes/1.1.1/pack.zip?version=1.1.1"
+      }
+    ]
+  },
+  "markdown": {
+    "useInternalRenderer": true
+  },
+  "params": {
+    "branding": true,
+    "password": "",
+    "logo": "",
+    "favicon": "",
+    "navLinks": [],
+    "lastPublishUrl": "",
+    "mdfriday": {
+      "family": "notes",
+      "variant": "business",
+      "version": "1.1.1"
+    }
+  },
+  "publish": {
+    "method": "cloudflare"
+  },
+  "languages": {
+    "en": {
+      "contentDir": "content",
+      "weight": 1
+    }
+  },
+  "canonicalHost": "https://share.fsky.top"
+}

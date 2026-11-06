@@ -1,0 +1,963 @@
+<script lang="ts">
+	import type FridayPlugin from '../../main';
+	import type { PublishMode, SelectionKind } from '../../types/publish-config';
+	import type { CatalogEntry } from '../../theme/types';
+	import { TFile } from 'obsidian';
+	import { filterThemesForSelection } from '../../utils/theme';
+	import { resolveSiteBaseUrl } from '../../cloudflare-env';
+	import HistorySection from '../HistorySection.svelte';
+	import { onDestroy, onMount } from 'svelte';
+
+	export let plugin: FridayPlugin;
+	export let t: (key: string, params?: Record<string, unknown>) => string;
+
+	export let selectionKind: SelectionKind;
+	export let fileName: string;
+	export let pathLabel: string;
+	export let publishMode: PublishMode;
+	export let showModeSwitch: boolean;
+	export let showFolderModeFixed: boolean;
+	export let showThemePicker: boolean;
+
+	export let themeList: CatalogEntry[];
+	export let selectedThemeSlug: string;
+	export let themesLoading: boolean;
+
+	/** Cloudflare remote project id (for Access Dashboard deep link). */
+
+	export let isPublishing: boolean;
+	export let publishProgress: number;
+	export let publishUrl: string;
+	export let publishError: string;
+	export let publishErrorAction: 'claim_free' | 'upgrade_personal' | null = null;
+	export let hasContent: boolean;
+	export let publishRevoked: boolean = false;
+	export let pathRemembered: boolean = false;
+	/** Plain-language expiry from server (empty if API did not return one). */
+	export let contentExpiryLabel: string = '';
+	export let contentExpiryExpired: boolean = false;
+
+	export let previewUrl: string;
+	export let isPreviewBuilding: boolean;
+	export let buildProgress: number;
+	export let hasPreview: boolean = false;
+	export let previewWasStopped: boolean = false;
+
+	export let lastCompletedAction: 'preview' | 'publish' | null = null;
+
+	export let historyRefreshKey: number = 0;
+	/** Current Foundry project name (History tab). */
+	export let projectName: string = '';
+	export let onRolledBack: (() => void | Promise<void>) | undefined = undefined;
+
+	/** Bump when account quota snapshot changes (forces banner re-read). */
+	export let quotaRevision: number = 0;
+	/** Bump after claim / account refresh — closes softgate and re-reads plan. */
+	export let accountEpoch: number = 0;
+	/** Bump to reload published-target dropdown. */
+	export let targetListRevision: number = 0;
+	/** Current vault path for matching dropdown checkmark. */
+	export let activeVaultPath: string | null = null;
+
+	export let onSetMode: (mode: PublishMode) => void;
+	export let onSelectTheme: (slug: string) => void;
+	export let onOpenThemesCatalog: () => void;
+
+	// Site advanced (title/logo/nav/domain/subscribe) removed for Share MVP.
+	export let onPublish: () => void;
+	export let onPreview: () => void;
+	export let onStopPreview: () => void;
+	export let onExportSite: (() => void | Promise<void>) | undefined = undefined;
+	export let isExporting: boolean = false;
+	export let onOpenUrl: () => void;
+	export let onCopyUrl: () => void;
+	export let onRevokeShare: () => void;
+	/** Called when user opens Account claim in browser — start focus/poll refresh. */
+	export let onClaimStarted: (() => void) | undefined = undefined;
+	export let onOpenPreview: () => void;
+	export let onCopyPreview: () => void;
+	export let onOpenAccount: (opts?: { intent?: 'claim' | 'upgrade' }) => void | Promise<void>;
+	export let onDismissResult: () => void;
+	export let onSelectTarget: ((sourcePath: string) => void | Promise<void>) | undefined = undefined;
+
+	type PanelTab = 'publish' | 'history';
+	type PlanTier = 'guest' | 'free' | 'personal';
+
+		type TargetOption = {
+		id: string;
+		sourcePath: string;
+		label: string;
+		kind: 'note';
+		status?: string;
+		workspaceId?: string | null;
+	};
+
+	let activeTab: PanelTab = 'publish';
+	let planOpen = false;
+	let softgateOpen = false;
+	let targetMenuOpen = false;
+	let targetOptions: TargetOption[] = [];
+	let targetsLoading = false;
+
+	$: kind = (accountEpoch, quotaRevision, (plugin.settings.mdfKeyKind || '').toLowerCase());
+	$: plan = (accountEpoch, quotaRevision, (plugin.settings.mdfKeyPlan || '').toLowerCase());
+	$: hasKey = !!(accountEpoch, quotaRevision, plugin.settings.mdfKey);
+	$: planTier = (
+		!hasKey || kind === 'guest' || plan === 'guest'
+			? 'guest'
+			: plan === 'personal' || plan === 'pro'
+				? 'personal'
+				: 'free'
+	) as PlanTier;
+	$: isPersonal = planTier === 'personal';
+	$: isGuest = planTier === 'guest';
+
+	let prevAccountEpoch = 0;
+	$: if (accountEpoch !== prevAccountEpoch) {
+		prevAccountEpoch = accountEpoch;
+		softgateOpen = false;
+		planOpen = false;
+		activeTab = 'publish';
+	}
+	$: filteredThemes = filterThemesForSelection(themeList, selectionKind);
+	$: showThemes = showThemePicker || (showFolderModeFixed && publishMode === 'themed');
+	$: themeSectionLabel = t('ui.theme_section_note');
+
+	// Share: no Turnstile / verify panel — guest mint is silent.
+	$: building = isPublishing || isPreviewBuilding;
+	$: progressPct = isPublishing ? publishProgress : buildProgress;
+	$: resultKind = !building && lastCompletedAction ? lastCompletedAction : null;
+	$: panelView = (softgateOpen
+		? 'softgate'
+		: building
+			? 'building'
+			: resultKind
+				? 'result'
+				: 'idle') as 'idle' | 'building' | 'result' | 'softgate';
+	$: showActions = activeTab === 'publish' && panelView === 'idle';
+	$: publishPrimaryLabel = publishUrl ? t('ui.publish_again') : t('ui.publish');
+	$: actionsDisabled = !hasContent || building;
+	$: projectStatus = (publishRevoked
+		? 'revoked'
+		: publishUrl
+			? 'published'
+			: 'unpublished') as 'published' | 'unpublished' | 'revoked';
+	$: previewLive = hasPreview && !!previewUrl && !isPreviewBuilding;
+
+	$: projectUsed = (quotaRevision, plugin.settings.mdfProjectCount);
+	$: projectMax =
+		(quotaRevision,
+		plugin.settings.mdfQuotaMaxProjects ??
+			(planTier === 'guest' ? 1 : null));
+	$: storageUsed = (quotaRevision, plugin.settings.mdfStorageBytes);
+	$: storageMax =
+		(quotaRevision,
+		plugin.settings.mdfQuotaStorageBytes ??
+			(planTier === 'guest' ? 5 * 1024 * 1024 : planTier === 'free' ? 50 * 1024 * 1024 : null));
+
+	function formatBytesShort(n: number | null | undefined): string {
+		if (n == null || !Number.isFinite(n)) return '—';
+		if (n < 1024) return `${n} B`;
+		if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+		return `${(n / (1024 * 1024)).toFixed(n >= 100 * 1024 * 1024 ? 0 : 1)} MB`;
+	}
+
+	$: projectsLine =
+		projectMax == null
+			? projectUsed != null
+				? t('ui.quota_projects_unlimited').replace('{{used}}', String(projectUsed))
+				: t('ui.quota_projects_unlimited_label')
+			: t('ui.quota_projects')
+					.replace('{{used}}', String(projectUsed ?? 0))
+					.replace('{{max}}', String(projectMax));
+
+	$: storageLine = t('ui.quota_storage')
+		.replace('{{used}}', formatBytesShort(storageUsed ?? 0))
+		.replace('{{max}}', formatBytesShort(storageMax));
+
+	$: bannerPrimary =
+		planTier === 'guest'
+			? t('ui.banner_guest_lead')
+			: planTier === 'free'
+				? t('ui.banner_free_lead')
+				: '';
+
+	$: bannerCtaLabel =
+		planTier === 'guest' ? t('ui.plan_cta_claim_sites') : t('ui.plan_cta_upgrade_sites');
+
+	async function openClaimAccount(e?: MouseEvent) {
+		e?.stopPropagation();
+		await onOpenAccount({ intent: 'claim' });
+		onClaimStarted?.();
+	}
+
+	async function openUpgradeAccount(e?: MouseEvent) {
+		e?.stopPropagation();
+		await onOpenAccount({ intent: 'upgrade' });
+	}
+
+	function togglePlan(e?: MouseEvent) {
+		e?.stopPropagation();
+		planOpen = !planOpen;
+	}
+
+	function onDocClick(ev: MouseEvent) {
+		const target = ev.target as HTMLElement | null;
+		if (
+			!target?.closest?.('.plan-popover') &&
+			!target?.closest?.('.plan-pill') &&
+			!target?.closest?.('.upgrade-banner')
+		) {
+			planOpen = false;
+		}
+		if (!target?.closest?.('.target-switcher')) {
+			targetMenuOpen = false;
+		}
+	}
+
+	function onKey(ev: KeyboardEvent) {
+		if (ev.key === 'Escape') {
+			planOpen = false;
+			softgateOpen = false;
+			targetMenuOpen = false;
+		}
+	}
+
+	async function loadTargetOptions() {
+		const mgr = plugin.projectServiceManager;
+		if (!mgr || !plugin.settings.mdfKey) {
+			targetOptions = [];
+			return;
+		}
+		targetsLoading = true;
+		try {
+			const res = await mgr.listRemoteCloudflareProjects();
+			const vault = plugin.app.vault;
+			const workspaceId = plugin.getWorkspaceId();
+			const next: TargetOption[] = [];
+			for (const p of res.projects || []) {
+				const sourcePath =
+					typeof p.sourcePath === 'string' && p.sourcePath.trim()
+						? p.sourcePath.replace(/\\/g, '/')
+						: null;
+				if (!sourcePath) continue;
+				// Only this vault's projects (legacy null workspaceId still shown until claimed).
+				const rowWs =
+					typeof p.workspaceId === 'string' && p.workspaceId.trim()
+						? p.workspaceId.trim()
+						: null;
+				if (rowWs && rowWs !== workspaceId) continue;
+				const abs = vault.getAbstractFileByPath(sourcePath);
+				if (!(abs instanceof TFile) || abs.extension !== 'md') continue;
+				if (p.kind === 'folder') continue; // Share ignores wiki/folder projects
+				next.push({
+					id: p.id,
+					sourcePath,
+					label: abs.basename,
+					kind: 'note',
+					workspaceId: rowWs,
+					...(typeof p.status === 'string' ? { status: p.status } : {}),
+				});
+			}
+			targetOptions = next;
+		} catch (err) {
+			console.warn('[PublishPanel] loadTargetOptions failed', err);
+			targetOptions = [];
+		} finally {
+			targetsLoading = false;
+		}
+	}
+
+	$: targetListRevision, accountEpoch, void loadTargetOptions();
+
+	$: selectedTargetMatched = targetOptions.some(
+		(o) => activeVaultPath && o.sourcePath === activeVaultPath,
+	);
+
+	function toggleTargetMenu(e?: MouseEvent) {
+		e?.stopPropagation();
+		targetMenuOpen = !targetMenuOpen;
+		if (targetMenuOpen) {
+			void loadTargetOptions();
+		}
+	}
+
+	async function pickTarget(opt: TargetOption) {
+		targetMenuOpen = false;
+		if (activeVaultPath && opt.sourcePath === activeVaultPath) return;
+		await onSelectTarget?.(opt.sourcePath);
+	}
+
+	onMount(() => {
+		document.addEventListener('click', onDocClick);
+		document.addEventListener('keydown', onKey);
+		void loadTargetOptions();
+	});
+	onDestroy(() => {
+		document.removeEventListener('click', onDocClick);
+		document.removeEventListener('keydown', onKey);
+	});
+
+	function setTab(tab: PanelTab) {
+		activeTab = tab;
+		planOpen = false;
+		softgateOpen = false;
+	}
+
+	function openSoftgate(e?: MouseEvent) {
+		e?.stopPropagation();
+		softgateOpen = true;
+		planOpen = false;
+		activeTab = 'publish';
+	}
+
+	function closeSoftgate() {
+		softgateOpen = false;
+	}
+
+	function openPlans(e?: MouseEvent) {
+		e?.stopPropagation();
+		softgateOpen = false;
+		planOpen = true;
+	}
+
+	function onQuotaCta(e?: MouseEvent) {
+		e?.stopPropagation();
+		if (publishErrorAction === 'claim_free' || planTier === 'guest') {
+			void openClaimAccount(e);
+			return;
+		}
+		void openUpgradeAccount(e);
+	}
+
+
+
+	function demoUrl(entry: CatalogEntry): string {
+		if (entry.demoUrl) return entry.demoUrl;
+		const site = resolveSiteBaseUrl(plugin.settings);
+		return `${site}/demo/${entry.slug}/index.html`;
+	}
+
+	function siteHomeUrl(): string {
+		return resolveSiteBaseUrl(plugin.settings);
+	}
+
+	function openDemo(e: MouseEvent, entry: CatalogEntry) {
+		e.stopPropagation();
+		e.preventDefault();
+		window.open(demoUrl(entry), '_blank', 'noopener');
+	}
+
+	function copyProjectUrl() {
+		if (!publishUrl || projectStatus === 'revoked') return;
+		void onCopyUrl();
+	}
+
+	function handlePublishClick() {
+		onPublish();
+	}
+
+	function handleResultBack() {
+		onDismissResult();
+	}
+
+	function handleStopPreview() {
+		onStopPreview();
+		if (resultKind === 'preview') onDismissResult();
+	}
+</script>
+
+<div class="mdf-apple-panel">
+	<div class="panel-header">
+		<div class="panel-title-row">
+			<header class="mdf-brand-header">
+				<a
+					class="mdf-brand-link"
+					href={siteHomeUrl()}
+					target="_blank"
+					rel="noopener noreferrer"
+					title="MDFriday"
+				>
+					<img
+						class="mdf-logo"
+						src="https://gohugo.net/mdfriday.svg"
+						width="18"
+						height="18"
+						alt="MDFriday"
+					/>
+					<span class="mdf-brand-title">MDFriday Share</span>
+				</a>
+			</header>
+			<button
+				type="button"
+				class="plan-pill {planTier}"
+				class:open={planOpen}
+				title={t('ui.plan_pill_title')}
+				on:click={togglePlan}
+			>
+				{planTier === 'guest' ? 'Guest' : planTier === 'free' ? 'Free' : 'Personal'}
+			</button>
+		</div>
+
+		<div class="panel-tabs">
+			<button
+				type="button"
+				class="panel-tab"
+				class:active={activeTab === 'publish'}
+				on:click={() => setTab('publish')}
+			>
+				{t('ui.tab_publish')}
+			</button>
+			<button
+				type="button"
+				class="panel-tab"
+				class:active={activeTab === 'history'}
+				on:click={() => setTab('history')}
+			>
+				{t('ui.tab_history')}
+			</button>
+		</div>
+
+		{#if planOpen}
+			<div class="plan-popover" role="dialog" aria-label={t('ui.plan_compare')}>
+				<div class="pp-title">{t('ui.plan_choose')}</div>
+				<div class="pp-note">{t('ui.plan_note')}</div>
+
+				<div class="pp-tier" class:current={planTier === 'guest'}>
+					<div class="pp-head">
+						<div class="pp-name">Guest</div>
+						<span class="pp-tag">{planTier === 'guest' ? t('ui.plan_current') : t('ui.plan_tier')}</span>
+					</div>
+					<div class="pp-best">{t('ui.plan_guest_best')}</div>
+					<div class="pp-price"><span class="muted">{t('ui.plan_guest_price')}</span></div>
+					<ul class="pp-benefits">
+						<li>{t('ui.plan_guest_b1')}</li>
+						<li>{t('ui.plan_guest_b_projects')}</li>
+						<li>{t('ui.plan_guest_b3')}</li>
+						<li>{t('ui.plan_guest_b4')}</li>
+						<li>{t('ui.plan_guest_b5')}</li>
+						<li class="note">{t('ui.plan_guest_note')}</li>
+					</ul>
+					{#if planTier === 'guest'}
+						<span class="pp-cta current-cta">{t('ui.plan_current')}</span>
+					{:else}
+						<a
+							class="pp-cta secondary"
+							href="https://obsidian.md/plugins?search=mdfriday-share"
+							target="_blank"
+							rel="noopener">{t('ui.plan_install_plugin')}</a
+						>
+					{/if}
+				</div>
+
+				<div class="pp-tier" class:current={planTier === 'free'}>
+					<div class="pp-head">
+						<div class="pp-name">Free</div>
+						<span class="pp-tag">{planTier === 'free' ? t('ui.plan_current') : t('ui.plan_upgrade')}</span>
+					</div>
+					<div class="pp-best">{t('ui.plan_free_best')}</div>
+					<div class="pp-price"><span class="muted">{t('ui.plan_free_price')}</span></div>
+					<ul class="pp-benefits">
+						<li>{t('ui.plan_free_b1')}</li>
+						<li>{t('ui.plan_free_b_projects')}</li>
+						<li>{t('ui.plan_free_b3')}</li>
+						<li>{t('ui.plan_free_b4')}</li>
+						<li>{t('ui.plan_free_b5')}</li>
+						<li class="note">{t('ui.plan_free_note')}</li>
+					</ul>
+					{#if planTier === 'free'}
+						<button type="button" class="pp-cta current-cta" on:click={() => onOpenAccount({ intent: 'claim' })}>{t('ui.account_manage')}</button>
+					{:else}
+						<button type="button" class="pp-cta" on:click={openClaimAccount}>{t('ui.plan_cta_claim_sites')}</button>
+					{/if}
+				</div>
+
+				<div class="pp-tier" class:current={planTier === 'personal'}>
+					<div class="pp-head">
+						<div class="pp-name">Personal</div>
+						<span class="pp-tag">{planTier === 'personal' ? t('ui.plan_current') : t('ui.plan_upgrade')}</span>
+					</div>
+					<div class="pp-best">{t('ui.plan_personal_best')}</div>
+					<div class="pp-price">$5 <span class="muted">{t('ui.plan_per_month')}</span></div>
+					<ul class="pp-benefits">
+						<li>{t('ui.plan_personal_b1')}</li>
+						<li>{t('ui.plan_personal_b_projects')}</li>
+						<li>{t('ui.plan_personal_b2')}</li>
+						<li>{t('ui.plan_personal_b3')}</li>
+						<li>{t('ui.plan_personal_b4')}</li>
+						<li>{t('ui.plan_personal_b5')}</li>
+					</ul>
+					{#if planTier === 'personal'}
+						<button type="button" class="pp-cta current-cta" on:click={() => onOpenAccount({ intent: 'claim' })}>{t('ui.account_manage_sub')}</button>
+					{:else}
+						<button type="button" class="pp-cta" on:click={openUpgradeAccount}>{t('ui.plan_cta_upgrade_sites')}</button>
+					{/if}
+				</div>
+
+				<div class="pp-footer">{t('ui.plan_footer')}</div>
+			</div>
+		{/if}
+	</div>
+
+	{#if activeTab === 'publish'}
+		<div class="panel-scroll">
+			{#if panelView === 'idle'}
+				{#if projectStatus === 'unpublished'}
+					<div class="card" style="padding:10px 14px;">
+						<div class="status-row" style="margin:0;">
+							<span class="status-dot unpublished"></span>
+							<span class="status-text" style="font-size:12px;font-weight:600;">{t('ui.project_unpublished')}</span>
+						</div>
+						<p class="helper" style="margin-top:4px;">{t('ui.project_unpublished_hint')}</p>
+						{#if previewLive}
+							<div class="preview-live-row">
+								<span class="pl-dot" aria-hidden="true"></span>
+								<div class="pl-body">
+									<div class="pl-title">{t('ui.preview_live')}</div>
+									<div class="pl-url">{previewUrl}</div>
+								</div>
+								<button type="button" class="pl-stop" on:click={handleStopPreview}>{t('ui.stop')}</button>
+							</div>
+						{:else if previewWasStopped}
+							<div class="preview-stopped-row">
+								<span class="ps-dot" aria-hidden="true"></span>
+								<span>{t('ui.preview_stopped')}</span>
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<div class="project-strip" class:revoked={projectStatus === 'revoked'}>
+						<div class="status-row">
+							<span class="status-dot" class:revoked={projectStatus === 'revoked'}></span>
+							<span class="status-text">
+								{projectStatus === 'revoked' ? t('ui.project_revoked') : t('ui.project_published')}
+							</span>
+						</div>
+						{#if publishUrl}
+							<div class="url-row">
+								<!-- svelte-ignore a11y-click-events-have-key-events -->
+								<!-- svelte-ignore a11y-no-static-element-interactions -->
+								<div
+									class="url-line"
+									class:disabled={projectStatus === 'revoked'}
+									title={t('ui.copy')}
+									on:click={copyProjectUrl}
+								>
+									{publishUrl}
+								</div>
+								{#if projectStatus === 'published'}
+									<!-- svelte-ignore a11y-invalid-attribute -->
+									<a
+										href="#"
+										class="strip-unpublish"
+										on:click|preventDefault|stopPropagation={onRevokeShare}
+									>
+										{t('ui.history_unpublish')}
+									</a>
+								{/if}
+							</div>
+						{/if}
+						{#if pathRemembered}
+							<div class="remember-badge">✓ {t('ui.project_remembered')}</div>
+						{/if}
+						{#if contentExpiryLabel}
+							<div
+								class="expiry-line"
+								class:is-expired={contentExpiryExpired}
+								title={t('ui.expiry_server_truth') || 'Server cleanup is authoritative'}
+							>
+								{contentExpiryLabel}
+								{#if contentExpiryExpired && isGuest}
+									<button type="button" class="link expiry-claim" on:click={openClaimAccount}
+										>{t('ui.plan_cta_claim_sites')}</button
+									>
+								{/if}
+							</div>
+						{/if}
+						{#if previewLive}
+							<div class="preview-live-row">
+								<span class="pl-dot" aria-hidden="true"></span>
+								<div class="pl-body">
+									<div class="pl-title">{t('ui.preview_live')}</div>
+									<div class="pl-url">{previewUrl}</div>
+								</div>
+								<button type="button" class="pl-stop" on:click={handleStopPreview}>{t('ui.stop')}</button>
+							</div>
+						{:else if previewWasStopped}
+							<div class="preview-stopped-row">
+								<span class="ps-dot" aria-hidden="true"></span>
+								<span>{t('ui.preview_stopped')}</span>
+							</div>
+						{/if}
+					</div>
+				{/if}
+
+				<div class="section-label">{t('ui.target_label')}</div>
+				<div class="card target-switcher">
+					<div
+						class="target-card"
+						class:open={targetMenuOpen}
+						role="button"
+						tabindex="0"
+						aria-expanded={targetMenuOpen}
+						aria-haspopup="listbox"
+						on:click={toggleTargetMenu}
+						on:keydown={(e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								toggleTargetMenu(e as unknown as MouseEvent);
+							}
+						}}
+					>
+						<div class="target-icon" aria-hidden="true">
+							<svg width="16" height="18" viewBox="0 0 16 18" fill="none">
+								<path
+									d="M2.5 1.5h7.2L13.5 5.3V16a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1Z"
+									fill="#fff"
+									stroke="#C7C7CC"
+									stroke-width="1"
+								/>
+								<path d="M9.5 1.5V5h3.8" stroke="#C7C7CC" stroke-width="1" />
+								<path d="M4.5 9h7M4.5 11.5h7M4.5 14h4.5" stroke="#D1D1D6" stroke-width="1" stroke-linecap="round" />
+							</svg>
+						</div>
+						<div class="target-info">
+							<div class="target-name" title={pathLabel || fileName || ''}>
+								{fileName || t('ui.no_content_selected_hint')}
+							</div>
+						</div>
+						<span class="target-kind-tag">
+							{t('ui.badge_note')}
+						</span>
+						<span class="target-chevron" aria-hidden="true">
+							<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+								<path
+									d="M3 4.5L6 7.5L9 4.5"
+									stroke="currentColor"
+									stroke-width="1.5"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								/>
+							</svg>
+						</span>
+					</div>
+					{#if targetMenuOpen}
+						<div class="target-menu" role="listbox">
+							{#if targetsLoading}
+								<div class="target-menu-empty">{t('ui.loading') || '…'}</div>
+							{:else if targetOptions.length === 0}
+								<div class="target-menu-empty">{t('ui.target_menu_empty')}</div>
+							{:else}
+								{#each targetOptions as opt (opt.id)}
+									<div
+										class="target-menu-item"
+										class:active={activeVaultPath === opt.sourcePath}
+										role="option"
+										tabindex="0"
+										aria-selected={activeVaultPath === opt.sourcePath}
+										on:click={() => pickTarget(opt)}
+										on:keydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												void pickTarget(opt);
+											}
+										}}
+									>
+										<span class="target-menu-icon" aria-hidden="true">
+											<svg width="14" height="16" viewBox="0 0 16 18" fill="none">
+												<path
+													d="M2.5 1.5h7.2L13.5 5.3V16a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1V2.5a1 1 0 0 1 1-1Z"
+													fill="#fff"
+													stroke="#C7C7CC"
+													stroke-width="1"
+												/>
+											</svg>
+										</span>
+										<span class="target-menu-label">
+											{opt.label}
+											<span class="target-menu-sep">·</span>
+											{t('ui.badge_note')}
+										</span>
+										{#if activeVaultPath === opt.sourcePath}
+											<span class="target-menu-check" aria-hidden="true">
+												<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+													<path
+														d="M3 7.2L5.8 10L11 4"
+														stroke="var(--interactive-accent, #5B7CFA)"
+														stroke-width="1.8"
+														stroke-linecap="round"
+														stroke-linejoin="round"
+													/>
+												</svg>
+											</span>
+										{/if}
+									</div>
+								{/each}
+							{/if}
+							{#if !selectedTargetMatched && fileName}
+								<div class="target-menu-hint">{t('ui.target_menu_unpublished')}</div>
+							{/if}
+						</div>
+					{/if}
+				</div>
+
+				<div class="section-label">{t('ui.publish_method')}</div>
+				<div class="card card-modes">
+					<div class="mode-seg" role="radiogroup" aria-label={t('ui.publish_method')}>
+						{#if showModeSwitch}
+							<!-- Use div (not button) so Obsidian global button chrome cannot pill/reshape these options -->
+							<div
+								class="mode-option"
+								class:active={publishMode === 'faithful'}
+								role="radio"
+								aria-checked={publishMode === 'faithful'}
+								tabindex="0"
+								on:click={() => onSetMode('faithful')}
+								on:keydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										onSetMode('faithful');
+									}
+								}}
+							>
+								<div class="mode-row">
+									<div class="mode-copy">
+										<div class="mode-title">{t('ui.mode_faithful')}</div>
+										<div class="mode-desc">{t('ui.mode_faithful_hint')}</div>
+									</div>
+									<span class="radio" aria-hidden="true"></span>
+								</div>
+							</div>
+							<div
+								class="mode-option"
+								class:active={publishMode === 'themed'}
+								role="radio"
+								aria-checked={publishMode === 'themed'}
+								tabindex="0"
+								on:click={() => onSetMode('themed')}
+								on:keydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										onSetMode('themed');
+									}
+								}}
+							>
+								<div class="mode-row">
+									<div class="mode-copy">
+										<div class="mode-title">{t('ui.mode_themed_note')}</div>
+										<div class="mode-desc">{t('ui.mode_themed_hint')}</div>
+									</div>
+									<span class="radio" aria-hidden="true"></span>
+								</div>
+							</div>
+							<p class="helper mode-helper">
+								{publishMode === 'faithful'
+									? t('ui.mode_faithful_helper')
+									: t('ui.mode_themed_helper')}
+							</p>
+
+						{/if}
+					</div>
+				</div>
+
+				{#if showThemes}
+					<div class="section-label">{themeSectionLabel}</div>
+					{#if themesLoading}
+						<p class="helper">{t('ui.loading')}…</p>
+					{:else if filteredThemes.length === 0}
+						<p class="helper">{t('ui.theme_empty')}</p>
+						<button type="button" class="btn btn-ghost" on:click={onOpenThemesCatalog}>{t('ui.theme_all')}</button>
+					{:else}
+						<div class="theme-list">
+							{#each filteredThemes as theme (theme.slug)}
+								<button
+									type="button"
+									class="theme-row"
+									class:selected={selectedThemeSlug === theme.slug}
+									on:click={() => onSelectTheme(theme.slug)}
+								>
+									<div class="theme-meta">
+										<div class="theme-name">{theme.name}</div>
+									</div>
+									<a
+										class="theme-demo"
+										href={demoUrl(theme)}
+										target="_blank"
+										rel="noopener"
+										on:click={(e) => openDemo(e, theme)}>{t('ui.theme_live_demo')}</a
+									>
+									<div class="theme-check">✓</div>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				{/if}
+
+				{#if bannerPrimary}
+					<div class="upgrade-banner">
+						<div class="ub-copy">
+							<div class="ub-lead">{bannerPrimary}</div>
+							<div class="ub-meta">{projectsLine} · {storageLine}</div>
+						</div>
+						<div class="ub-actions">
+							<button type="button" class="link" on:click={openPlans}>{t('ui.view_plans')}</button>
+							<span class="ub-sep" aria-hidden="true">·</span>
+							{#if isGuest}
+								<button type="button" class="link ub-cta" on:click={openClaimAccount}>{bannerCtaLabel}</button>
+							{:else}
+								<button type="button" class="link ub-cta" on:click={openUpgradeAccount}>{bannerCtaLabel}</button>
+							{/if}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Advanced site options removed for Share (no title/logo/nav/domain/subscribe). -->
+
+				{#if publishError}
+					<div class="quota-error" class:is-quota={!!publishErrorAction}>
+						<p class="helper warn">{publishError}</p>
+						{#if publishErrorAction}
+							<button type="button" class="btn btn-primary btn-pill" on:click={onQuotaCta}>
+								{publishErrorAction === 'claim_free'
+									? t('ui.plan_cta_claim_sites')
+									: t('ui.plan_cta_upgrade_sites')}
+							</button>
+						{/if}
+					</div>
+				{/if}
+			{:else if panelView === 'building'}
+				<div class="state-view">
+					<div class="spinner"></div>
+					<div class="state-title">{t('ui.building_title')}</div>
+					<div class="state-desc">
+						{isPreviewBuilding ? t('ui.building_preview') : t('ui.building_publish')}
+					</div>
+					<div class="progress-track">
+						<div class="progress-fill" style="width: {Math.max(4, progressPct)}%"></div>
+					</div>
+				</div>
+			{:else if panelView === 'result' && resultKind}
+				<div class="state-view state-result">
+					<div class="result-badge {resultKind}">
+						{resultKind === 'preview' ? t('ui.result_badge_preview') : t('ui.result_badge_publish')}
+					</div>
+					<div class="success-check" class:preview={resultKind === 'preview'} aria-hidden="true">
+						<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+							<path
+								d="M5 12.5 9.5 17 19 7.5"
+								stroke="currentColor"
+								stroke-width="2.4"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+						</svg>
+					</div>
+					<div class="state-title">
+						{resultKind === 'preview' ? t('ui.result_title_preview') : t('ui.result_title_publish')}
+					</div>
+					<div class="state-desc">
+						{resultKind === 'preview' ? t('ui.result_desc_preview') : t('ui.result_desc_publish')}
+					</div>
+					<div class="success-url-box">
+						<div class="url">{resultKind === 'preview' ? previewUrl : publishUrl}</div>
+						<div class="success-actions">
+							<button
+								type="button"
+								class="btn btn-secondary btn-sm"
+								on:click={resultKind === 'preview' ? onCopyPreview : onCopyUrl}>{t('ui.copy')}</button
+							>
+							<button
+								type="button"
+								class="btn btn-primary btn-sm"
+								on:click={resultKind === 'preview' ? onOpenPreview : onOpenUrl}>{t('ui.open')}</button
+							>
+						</div>
+					</div>
+					{#if resultKind === 'publish' && contentExpiryLabel}
+						<p class="result-helper" class:is-expired={contentExpiryExpired}>{contentExpiryLabel}</p>
+					{/if}
+					{#if resultKind === 'preview'}
+						<p class="result-helper">{t('ui.result_preview_helper')}</p>
+					{/if}
+					<div class="result-secondary-wrap">
+						{#if resultKind === 'preview' && onExportSite}
+							<button
+								type="button"
+								class="btn btn-secondary btn-full"
+								disabled={isExporting}
+								on:click={() => onExportSite?.()}
+							>
+								{isExporting ? t('ui.exporting') : t('ui.export_site')}
+							</button>
+						{/if}
+						{#if resultKind === 'publish' && publishUrl}
+							<button type="button" class="btn-danger-soft" on:click={onRevokeShare}>{t('ui.revoke_share')}</button>
+						{:else if resultKind === 'preview'}
+							<button type="button" class="btn-danger-soft" on:click={handleStopPreview}>{t('ui.stop_preview')}</button>
+						{/if}
+						<button type="button" class="btn btn-ghost" on:click={handleResultBack}>{t('ui.back')}</button>
+					</div>
+				</div>
+			{:else if panelView === 'softgate'}
+				<div class="state-view">
+					<div style="font-size:32px;margin-bottom:12px;">✦</div>
+					<div class="state-title">{t('ui.softgate_title')}</div>
+					<div class="state-desc">{t('ui.softgate_desc')}</div>
+					<div class="softgate-benefits">
+						<div>{t('ui.softgate_b1')}</div>
+						<div>{t('ui.softgate_b2')}</div>
+						<div>{t('ui.softgate_b3')}</div>
+					</div>
+					<div style="width:100%;margin-top:20px;display:flex;flex-direction:column;gap:8px;">
+						<button type="button" class="btn btn-primary btn-full" on:click={openClaimAccount}
+							>{t('ui.plan_cta_claim_sites')}</button
+						>
+						<button type="button" class="btn btn-secondary btn-full" on:click={closeSoftgate}>{t('ui.softgate_later')}</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+	{:else}
+		<div class="panel-scroll">
+			<div class="section-label">{t('ui.history_section')}</div>
+			{#if !isPersonal}
+				<div class="history-locked">
+					<div class="ico" aria-hidden="true">
+						<svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+							<path
+								d="M7 11V8a5 5 0 0 1 10 0v3"
+								stroke="#86868B"
+								stroke-width="1.8"
+								stroke-linecap="round"
+							/>
+							<rect x="5" y="11" width="14" height="10" rx="2.5" fill="#E8E8ED" stroke="#C7C7CC" stroke-width="1.2" />
+							<circle cx="12" cy="16" r="1.4" fill="#86868B" />
+						</svg>
+					</div>
+					<div class="hl-title">{t('ui.history_locked_title')}</div>
+					<div class="hl-desc">{t('ui.history_locked_desc')}</div>
+					<button type="button" class="btn btn-primary btn-pill" on:click={openUpgradeAccount}
+						>{t('ui.account_upgrade_personal')}</button
+					>
+				</div>
+			{:else}
+				<div class="apple-history-slot">
+					<HistorySection
+						{plugin}
+						{projectName}
+						refreshKey={historyRefreshKey}
+						layout="tab"
+						canRollback={isPersonal}
+						onUnpublish={onRevokeShare}
+						onRolledBack={onRolledBack}
+					/>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	<div class="panel-actions" class:is-hidden={!showActions}>
+		<button type="button" class="btn btn-secondary" disabled={actionsDisabled} on:click={onPreview}>{t('ui.preview_action')}</button>
+		<button type="button" class="btn btn-primary" disabled={actionsDisabled} on:click={handlePublishClick}>{publishPrimaryLabel}</button>
+	</div>
+</div>

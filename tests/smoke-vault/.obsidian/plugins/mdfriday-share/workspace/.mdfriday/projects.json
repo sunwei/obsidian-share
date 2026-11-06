@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "projects": [
+    {
+      "id": "sample-share-note-mw4cxj1o",
+      "name": "sample-share-note",
+      "path": "sample-share-note",
+      "absolutePath": "/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/.obsidian/plugins/mdfriday-share/workspace/projects/sample-share-note",
+      "createdAt": 1793932229297,
+      "updatedAt": 1793932287304,
+      "status": "active"
+    }
+  ]
+}
