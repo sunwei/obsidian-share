@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-share",
-	"version": "26.11.0",
+	"version": "26.11.1",
 	"description": "MDFriday Share \u2014 publish a single note as a public link. Desktop.",
 	"main": "main.js",
 	"type": "module",
@@ -16,7 +16,7 @@
 		"lint:ci": "eslint src/ --max-warnings=0",
 		"verify:theme-config": "node scripts/verify-theme-config.mjs",
 		"test": "node --test tests/*.test.ts",
-		"build:with-core": "npm run build --prefix ../core && npm run build",
+		"build:with-core": "npm run build --prefix ../core && npm install --no-save ../core && npm run build",
 		"build:staging": "MDF_CF_ENV=staging node esbuild.config.mjs production",
 		"sync:smoke-vault": "node scripts/sync-smoke-vault.mjs",
 		"build:smoke": "npm run build:staging && npm run sync:smoke-vault",
@@ -53,7 +53,7 @@
 		"typescript-eslint": "^8.63.0"
 	},
 	"dependencies": {
-		"@mdfriday/core": "file:../core",
+		"@mdfriday/core": "26.11.0",
 		"jszip": "^3.10.1"
 	}
 }
