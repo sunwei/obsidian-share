@@ -1,0 +1,20 @@
+{
+  "id": "ui-password-share-e2e-mw8psuc9-z3fqr3-mw8pswio",
+  "name": "ui-password-share-e2e-mw8psuc9-z3fqr3",
+  "type": "site",
+  "createdAt": 1794195713188,
+  "updatedAt": 1794198799371,
+  "workspaceId": "workspace-1793932199916-pq2px5juq",
+  "fileLink": {
+    "sourcePath": "/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/Notes/ui-password-share-e2e-mw8psuc9-z3fqr3.md",
+    "targetPath": "/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/.obsidian/plugins/mdfriday-share/workspace/projects/ui-password-share-e2e-mw8psuc9-z3fqr3/content/index.md",
+    "isSymlink": true
+  },
+  "cloudflare": {
+    "cloudflareProjectId": "p_a3acea333cf46dd128770d93a2a113f2",
+    "hostingMode": "share",
+    "boundAt": 1794195715246,
+    "siteId": "q2x4uc",
+    "publicBaseUrl": "https://share.fsky.top"
+  }
+}

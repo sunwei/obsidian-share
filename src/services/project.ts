@@ -488,7 +488,8 @@ export class ProjectServiceManager {
 			this.plugin.settings.mdfContentExpiresAt = guest.contentExpiresAt;
 		}
 		this.plugin.settings.mdfProjectCount = this.plugin.settings.mdfProjectCount ?? 0;
-		this.plugin.settings.mdfQuotaMaxProjects = this.plugin.settings.mdfQuotaMaxProjects ?? 1;
+		// Share does not gate on site count — only storage. Keep maxProjects unset (unlimited).
+		this.plugin.settings.mdfQuotaMaxProjects = null;
 		this.plugin.settings.mdfStorageBytes = this.plugin.settings.mdfStorageBytes ?? 0;
 		this.plugin.settings.mdfQuotaStorageBytes =
 			this.plugin.settings.mdfQuotaStorageBytes ?? 100 * 1024 * 1024;
@@ -578,12 +579,8 @@ export class ProjectServiceManager {
 				typeof account.contentExpiresAt === 'number' ? account.contentExpiresAt : null;
 			this.plugin.settings.mdfProjectCount =
 				typeof account.projectCount === 'number' ? account.projectCount : 0;
-			this.plugin.settings.mdfQuotaMaxProjects =
-				account.quota?.maxProjects === null
-					? null
-					: typeof account.quota?.maxProjects === 'number'
-						? account.quota.maxProjects
-						: null;
+			// Share ignores site-count quota from the API (storage-only).
+			this.plugin.settings.mdfQuotaMaxProjects = null;
 			this.plugin.settings.mdfQuotaRetentionDays =
 				account.quota?.retentionDays === null
 					? null
@@ -628,24 +625,19 @@ export class ProjectServiceManager {
 
 	/**
 	 * Local quota gate before creating a new remote project.
-	 * Avoids a guaranteed 402 round-trip when the plan is already at max sites.
+	 * Share is storage-only — site count is not enforced client-side.
 	 */
 	async assertCanCreateRemoteProject(): Promise<
 		{ ok: true } | { ok: false; error: string; code: 'quota_exceeded' }
 	> {
 		await this.refreshCloudflareAccount();
-		const used = this.plugin.settings.mdfProjectCount ?? 0;
-		const max = this.plugin.settings.mdfQuotaMaxProjects;
-		const plan = (this.plugin.settings.mdfKeyPlan || 'guest').toLowerCase();
-		const effectiveMax = max === null ? null : typeof max === 'number' ? max : null;
-		if (effectiveMax != null && used >= effectiveMax) {
+		const used = this.plugin.settings.mdfStorageBytes ?? 0;
+		const max = this.plugin.settings.mdfQuotaStorageBytes;
+		if (typeof max === 'number' && max > 0 && used >= max) {
 			return {
 				ok: false,
 				code: 'quota_exceeded',
-				error:
-					plan === 'guest'
-						? 'Site limit reached. Sign up free for 200 MB permanent storage.'
-						: `Site limit reached (${used}/${effectiveMax}).`,
+				error: 'Storage quota exceeded.',
 			};
 		}
 		return { ok: true };
@@ -912,44 +904,12 @@ export class ProjectServiceManager {
 			});
 			const buildT0 = Date.now();
 
-			let access:
-				| {
-						workspaceId: string;
-						projectId: string;
-						remoteProjectId: string;
-						epochs?: Record<string, number>;
-						apiBaseUrl?: string;
-				  }
-				| undefined;
-			if (projectId) {
-				try {
-					const foundry = this.plugin.foundryPublishService;
-					const auth = await this.resolveAuthToken();
-					let epochs: Record<string, number> = {};
-					if (foundry && auth && typeof foundry.getAccessState === 'function') {
-						const state = await foundry.getAccessState(auth.token, projectId);
-						for (const [slug, v] of Object.entries(state.scopes ?? {})) {
-							epochs[slug] = v.epoch;
-						}
-					}
-					access = {
-						workspaceId: this.plugin.getWorkspaceId(),
-						projectId: projectName,
-						remoteProjectId: projectId,
-						epochs,
-						apiBaseUrl: this.plugin.settings.cloudflareApiBaseUrl,
-					};
-				} catch (e) {
-					console.warn('[ProjectServiceManager] access state skipped', e);
-				}
-			}
-
+			// Share uses legacy site password encrypt — do not inject member-access build.
 			const buildResult = await this.build(
 				projectName,
 				(progress) => {
 					onProgress?.(progress);
 				},
-				access,
 			);
 			const durationMs = Date.now() - buildT0;
 

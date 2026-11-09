@@ -1,0 +1,1 @@
+/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/Notes/ui-password-note.md

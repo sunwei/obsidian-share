@@ -1,8 +1,11 @@
 /**
- * Publish-panel selection is independent of workspace focus.
+ * Share panel selection tracks the active markdown note.
  *
- * explicit — context menu, published target, command. Stays until the next explicit target.
+ * explicit — context menu / published target / command (may expand the sidebar).
  * follow — seeded from an empty panel, then tracks notes the user opens.
+ *
+ * Share is note-only: once the panel is open, active-file changes always update
+ * the target so users do not need to right-click every note.
  * Panel controls (theme, demo, password) are not selection signals.
  */
 
@@ -21,7 +24,9 @@ export function allowFollow(
 		return origin == null && !signal.hasTarget;
 	}
 	if (signal.type === 'active-file-changed') {
-		return origin !== 'explicit';
+		// Always follow the active note while Share is open (explicit does not pin).
+		void origin;
+		return true;
 	}
 	return false;
 }

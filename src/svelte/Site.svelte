@@ -41,6 +41,7 @@
 		writeZipFile,
 	} from "../utils/export-site";
 	import { classifyBuildError, reportBuildEvent } from "../services/build-analytics";
+	import { generateSharePassword, withPasswordFragment } from "../utils/share-password";
 
 	// Receive props
 	export let app: App;
@@ -153,6 +154,8 @@
 	let subscribeEnabled = false;
 	let subscribeTitle = '';
 	let subscribeDescription = '';
+	/** Legacy site password (Share). Empty = public. System-generated; not user-editable. */
+	let sitePassword = '';
 	
 	// UI state
 	let autoPublishEnabled = false;
@@ -466,6 +469,33 @@
 		subscribeEnabled = false;
 		subscribeTitle = '';
 		subscribeDescription = '';
+		{
+			const fromFoundry =
+				typeof state.config.params?.password === 'string'
+					? state.config.params.password.trim()
+					: '';
+			const pathPwd = statePath
+				? (getPathPublishConfig(plugin, statePath)?.sharePassword || '').trim()
+				: '';
+			// Foundry wins when set; else pathConfigs (soft-follow / pre-create); else keep
+			// preserved password from reset(keepSelection) for first-publish project bind.
+			if (fromFoundry) {
+				sitePassword = fromFoundry;
+				// Backfill pathConfigs so soft-follow restores #password= without reloading Foundry.
+				if (statePath && pathPwd !== fromFoundry) {
+					const kind = selectionKindFromContents(currentContents);
+					const mode = coercePublishMode(kind, publishMode);
+					void savePathPublishConfig(plugin, statePath, {
+						mode,
+						themeSlug: mode === 'themed' ? selectedThemeSlug || undefined : undefined,
+						hasPasswordFlag: true,
+						sharePassword: fromFoundry,
+					});
+				}
+			} else if (pathPwd) {
+				sitePassword = pathPwd;
+			}
+		}
 		
 		// Load auto-publish setting
 		if (state.config.params?.autoPublish !== undefined) {
@@ -484,17 +514,18 @@
 
 		if (!stillCurrent()) return;
 
-		// Publish status is path-scoped (remote sourcePath) — never trust another
-		// project's leftover params.lastPublishUrl.
-		await refreshPublishStatusForVaultPath(statePath || currentPath, epoch);
+		// Path-scoped mode/password before URL refresh so #password= is restored.
+		const hydratePath = statePath || activeVaultPath;
+		if (hydratePath) {
+			lastHydratedPath = null;
+			await hydrateFromPathConfig(hydratePath);
+		}
 
 		if (!stillCurrent()) return;
 
-		// Path-scoped mode wins over Foundry theme leftovers (note → faithful by default).
-		if (activeVaultPath) {
-			lastHydratedPath = null;
-			await hydrateFromPathConfig(activeVaultPath);
-		}
+		// Publish status is path-scoped (remote sourcePath) — never trust another
+		// project's leftover params.lastPublishUrl.
+		await refreshPublishStatusForVaultPath(statePath || currentPath, epoch);
 
 		if (!stillCurrent()) return;
 
@@ -518,6 +549,10 @@
 		} catch {
 			/* ignore */
 		}
+
+		// Keep password when re-binding the same note (first publish creates the
+		// Foundry project and calls initialize → reset). Soft-follow clears it.
+		const preservedPassword = opts?.keepSelection ? sitePassword : '';
 
 		isBuilding = false;
 		isPreviewBuilding = false;
@@ -550,6 +585,7 @@
 		googleAnalyticsId = '';
 		disqusShortname = '';
 		sitePath = '';
+		sitePassword = preservedPassword;
 		if (!opts?.keepSelection) {
 			siteName = '';
 			projectName = '';
@@ -760,7 +796,8 @@
 			url = `${base}${path}`;
 		}
 		// Hosting redirects directory URLs to index.html — don't force the suffix in the UI.
-		return url.replace(/\/index\.html$/i, '/');
+		url = url.replace(/\/index\.html$/i, '/');
+		return withPasswordFragment(url, sitePassword);
 	}
 
 	async function persistPathContentExpiresAt(
@@ -814,15 +851,7 @@
 			persistLastPublishUrl(publishUrl);
 			plugin.settings.hasPublishedOnce = true;
 			void plugin.saveSettings();
-			const shared = Array.isArray(result.sharedKeys) ? result.sharedKeys[0] : null;
-			if (shared?.key) {
-				new Notice(
-					`Site published. Access key: ${shared.key}`,
-					12000,
-				);
-			} else {
-				new Notice(t('messages.site_published_successfully'), 5000);
-			}
+			new Notice(t('messages.site_published_successfully'), 5000);
 		}
 		targetListRevision += 1;
 		if (!skipPathHydrate) {
@@ -964,15 +993,12 @@
 			/ERR_CONNECTION_RESET|ECONNRESET|ERR_CONNECTION_CLOSED|socket hang up|network/i.test(raw);
 
 		if (isQuota) {
+			// Share quotas are storage-only; never surface site-count limit copy.
 			if (planLower === 'guest' || planLower === '' || !plugin.settings.mdfKeyPlan) {
-				publishError = isStorage
-					? t('ui.err_quota_storage_guest')
-					: t('ui.err_quota_projects_guest');
+				publishError = t('ui.err_quota_storage_guest');
 				publishErrorAction = 'claim_free';
 			} else if (planLower === 'free') {
-				publishError = isStorage
-					? t('ui.err_quota_storage_free')
-					: t('ui.err_quota_projects_free');
+				publishError = t('ui.err_quota_storage_free');
 				publishErrorAction = 'upgrade_personal';
 			} else {
 				publishError = isStorage ? t('ui.err_quota_storage_personal') : raw;
@@ -1256,6 +1282,13 @@
 			selectedThemeSlug = '';
 			selectedThemeName = 'Obsidian (faithful)';
 		}
+
+		const pathPwd = typeof cfg.sharePassword === 'string' ? cfg.sharePassword.trim() : '';
+		if (pathPwd) {
+			sitePassword = pathPwd;
+		} else if (!cfg.hasPasswordFlag && !sitePassword.trim()) {
+			sitePassword = '';
+		}
 	}
 
 	function schedulePersistPathConfig() {
@@ -1275,11 +1308,51 @@
 		if (!vaultPath) return;
 		const kind = selectionKindFromContents(currentContents);
 		const mode = coercePublishMode(kind, publishMode);
+		const pwd = sitePassword.trim();
 		await savePathPublishConfig(plugin, vaultPath, {
 			mode,
 			themeSlug: mode === 'themed' ? selectedThemeSlug || undefined : undefined,
-			hasPasswordFlag: false,
+			hasPasswordFlag: !!pwd,
+			sharePassword: pwd,
 		});
+	}
+
+	async function persistSharePassword() {
+		const pwd = sitePassword.trim();
+		await saveFoundryConfig('params.password', pwd);
+		// Path-scoped copy so soft-follow can restore #password= without a Foundry project.
+		await persistPathConfigNow();
+		if (publishUrl) {
+			publishUrl = buildPublishUrl(publishUrl);
+		}
+	}
+
+	function handlePasswordToggle(on: boolean) {
+		if (on) {
+			if (!sitePassword.trim()) {
+				sitePassword = generateSharePassword();
+			}
+		} else {
+			sitePassword = '';
+		}
+		void persistSharePassword();
+	}
+
+	function handlePasswordRegenerate() {
+		sitePassword = generateSharePassword();
+		void persistSharePassword();
+	}
+
+	async function copySharePassword() {
+		const pwd = sitePassword.trim();
+		if (!pwd) return;
+		try {
+			await navigator.clipboard.writeText(pwd);
+			new Notice(t('ui.password_copied') || 'Password copied', 2000);
+		} catch (error) {
+			console.error('Failed to copy password:', error);
+			new Notice('Failed to copy password');
+		}
 	}
 
 	let brandSaveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -1290,8 +1363,7 @@
 			brandSaveTimeout = null;
 		}
 		await saveFoundryConfig('title', siteName.trim());
-		// Access keys replace site password — clear legacy params.password if still set.
-		await saveFoundryConfig('params.password', '');
+		await saveFoundryConfig('params.password', sitePassword.trim());
 		await saveFoundryConfig('params.logo', siteLogo.trim());
 		await saveFoundryConfig('params.favicon', siteFavicon.trim());
 		await saveFoundryConfig('params.navLinks', serializeNavLinks(siteNavLinks));
@@ -1811,7 +1883,14 @@
 		lastCompletedAction = null;
 		projectName = '';
 		const path = folder?.path || file?.path || null;
-		void refreshPublishStatusForVaultPath(path, plugin.selectionEpoch);
+		const epoch = plugin.selectionEpoch;
+		void (async () => {
+			if (path) {
+				await hydrateFromPathConfig(path);
+			}
+			if (epoch !== plugin.selectionEpoch) return;
+			await refreshPublishStatusForVaultPath(path, epoch);
+		})();
 	}
 
 	function notifyTargetsChanged() {
@@ -1929,10 +2008,11 @@
 				await buildFaithfulToProject(plugin, {
 					file: firstContent.file!,
 					publicDir,
+					password: sitePassword.trim() || undefined,
 				});
 				buildProgress = 80;
 				const server = await serveFaithfulPublicDir(publicDir);
-				previewUrl = server.url;
+				previewUrl = withPasswordFragment(server.url, sitePassword);
 				previewId = publicDir;
 				absPreviewDir = publicDir;
 				hasPreview = true;
@@ -2174,6 +2254,7 @@
 					await buildFaithfulToProject(plugin, {
 						file,
 						publicDir,
+						password: sitePassword.trim() || undefined,
 					});
 					reportBuildEvent(plugin, {
 						event_type: 'BUILD_SUCCEEDED',
@@ -2559,5 +2640,9 @@
 	onOpenAccount={openAccountFromGrowth}
 	onDismissResult={dismissPanelResult}
 	onSelectTarget={selectPublishedTarget}
+	{sitePassword}
+	onPasswordToggle={handlePasswordToggle}
+	onPasswordRegenerate={handlePasswordRegenerate}
+	onCopyPassword={copySharePassword}
 />
 

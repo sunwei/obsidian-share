@@ -1,0 +1,44 @@
+{
+  "baseURL": "/s/q2x4uc/",
+  "title": "ui-password-share-e2e-mw8psuc9-z3fqr3",
+  "contentDir": "content",
+  "publishDir": "public",
+  "defaultContentLanguage": "en",
+  "taxonomies": {
+    "tag": "tags",
+    "category": "categories"
+  },
+  "module": {
+    "imports": [
+      {
+        "path": "https://cdn.fsky.top/t/notes/1.1.2/pack.zip?version=1.1.2"
+      }
+    ]
+  },
+  "markdown": {
+    "useInternalRenderer": true
+  },
+  "params": {
+    "branding": true,
+    "password": "67TTES18SP",
+    "logo": "",
+    "favicon": "",
+    "navLinks": [],
+    "lastPublishUrl": "https://share.fsky.top/s/q2x4uc/#password=67TTES18SP",
+    "mdfriday": {
+      "family": "notes",
+      "variant": "business",
+      "version": "1.1.2"
+    }
+  },
+  "publish": {
+    "method": "cloudflare"
+  },
+  "canonicalHost": "https://share.fsky.top",
+  "languages": {
+    "en": {
+      "contentDir": "content",
+      "weight": 1
+    }
+  }
+}

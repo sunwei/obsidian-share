@@ -1,0 +1,20 @@
+{
+  "id": "ui-password-note-mw8ppr2n",
+  "name": "ui-password-note",
+  "type": "site",
+  "createdAt": 1794195566165,
+  "updatedAt": 1794195574669,
+  "workspaceId": "workspace-1793932199916-pq2px5juq",
+  "fileLink": {
+    "sourcePath": "/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/Notes/ui-password-note.md",
+    "targetPath": "/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/.obsidian/plugins/mdfriday-share/workspace/projects/ui-password-note/content/index.md",
+    "isSymlink": true
+  },
+  "cloudflare": {
+    "cloudflareProjectId": "p_3cdf120e50e5403a4d52d7ccde207ed9",
+    "hostingMode": "share",
+    "boundAt": 1794195568161,
+    "siteId": "4VGqik",
+    "publicBaseUrl": "https://share.fsky.top"
+  }
+}

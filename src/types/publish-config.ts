@@ -17,8 +17,13 @@ export interface PathPublishConfig {
 	mode: PublishMode;
 	/** Catalog slug; required when mode=themed */
 	themeSlug?: string;
-	/** Local flag only — plaintext submitted at publish time, not persisted */
+	/** Whether this note uses password protect (UI). */
 	hasPasswordFlag?: boolean;
+	/**
+	 * Path-scoped Share password (vault-local plugin settings).
+	 * Needed so soft-follow can restore `#password=` on the publish URL.
+	 */
+	sharePassword?: string;
 	/**
 	 * Server project/content expiry (epoch ms). Cached for UI only —
 	 * cleanup is always decided by the API. Never invent client-side TTL.

@@ -55,6 +55,8 @@ export function resolvePathPublishConfig(
 		mode: coercePublishMode(kind, saved.mode),
 		themeSlug: saved.themeSlug,
 		hasPasswordFlag: !!saved.hasPasswordFlag,
+		sharePassword:
+			typeof saved.sharePassword === 'string' ? saved.sharePassword.trim() : undefined,
 		contentExpiresAt:
 			saved.contentExpiresAt === null
 				? null

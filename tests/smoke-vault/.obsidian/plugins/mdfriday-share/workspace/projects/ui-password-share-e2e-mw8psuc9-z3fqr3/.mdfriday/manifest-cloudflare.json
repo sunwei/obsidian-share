@@ -1,0 +1,108 @@
+{
+  "projectId": "ui-password-share-e2e-mw8psuc9-z3fqr3-mw8pswio",
+  "publishMethod": "cloudflare",
+  "lastPublishTime": 1794198794642,
+  "remoteConfig": {
+    "projectId": "p_a3acea333cf46dd128770d93a2a113f2",
+    "hostingMode": "share",
+    "siteId": "q2x4uc"
+  },
+  "files": {
+    "assets/InterVariable-Italic.woff2": {
+      "hash": "e564f652916db6c139570fefb9524a77c4d48f30c92928de9db19b6b5c7a262a",
+      "size": 387976,
+      "mtime": 1794198793378.8242,
+      "relativePath": "assets/InterVariable-Italic.woff2"
+    },
+    "assets/InterVariable.woff2": {
+      "hash": "693b77d4f32ee9b8bfc995589b5fad5e99adf2832738661f5402f9978429a8e3",
+      "size": 352240,
+      "mtime": 1794198793374.975,
+      "relativePath": "assets/InterVariable.woff2"
+    },
+    "assets/SourceCodePro-Bold.ttf": {
+      "hash": "839f42df29a5a83470888b9a3aa4064fc1bc35e6616bb542226d89086f019ec5",
+      "size": 191568,
+      "mtime": 1794198793368.452,
+      "relativePath": "assets/SourceCodePro-Bold.ttf"
+    },
+    "assets/SourceCodePro-BoldItalic.ttf": {
+      "hash": "a0cfec834df50e21cdb3d15bf93e87ed033d8c26693f9ede6efe24325ae22c9e",
+      "size": 155288,
+      "mtime": 1794198793370.6338,
+      "relativePath": "assets/SourceCodePro-BoldItalic.ttf"
+    },
+    "assets/SourceCodePro-Italic.ttf": {
+      "hash": "ba51b929995b3088ff1932d9d6835c90ccf304b296a3b8e103d2e95b958109ee",
+      "size": 161376,
+      "mtime": 1794198793365.8572,
+      "relativePath": "assets/SourceCodePro-Italic.ttf"
+    },
+    "assets/SourceCodePro-Regular.ttf": {
+      "hash": "6e5dd0494f63d85970156cd54b6ac568b82a392d135db08bbf5cc3048d489aa9",
+      "size": 192740,
+      "mtime": 1794198793362.9395,
+      "relativePath": "assets/SourceCodePro-Regular.ttf"
+    },
+    "assets/external-link-rtl.svg": {
+      "hash": "a44ac4cbf79c6765f4bdc3a0dc3fb51b56ed5eb4679177f0a40f04b63b3e3a3c",
+      "size": 278,
+      "mtime": 1794198793381.6245,
+      "relativePath": "assets/external-link-rtl.svg"
+    },
+    "assets/external-link.svg": {
+      "hash": "a7c6a118d17f6a296037b519e9891e08951de59c289fe41ec2596a63c3b28516",
+      "size": 315,
+      "mtime": 1794198793380.3538,
+      "relativePath": "assets/external-link.svg"
+    },
+    "assets/flow-circular.woff2": {
+      "hash": "81d33d08a96d99034c41b49ac980f63b353175f919db817d74e0405749af03db",
+      "size": 7876,
+      "mtime": 1794198793372.4912,
+      "relativePath": "assets/flow-circular.woff2"
+    },
+    "index.html": {
+      "hash": "878a8c192fbee1f5da50a538ba1ebed36036bf79a1d2f284bddc2f892d27981c",
+      "size": 818121,
+      "mtime": 1794198793778.0164,
+      "relativePath": "index.html"
+    },
+    "theme-snapshot/obsidian-core.css": {
+      "hash": "0327a0b534969039e4b03ffdb1c965f5550e76b031900f928163172465876727",
+      "size": 598201,
+      "mtime": 1794198793722.7869,
+      "relativePath": "theme-snapshot/obsidian-core.css"
+    },
+    "theme-snapshot/runtime.css": {
+      "hash": "556ad8d6f23ee62e8e8db1bd3b1752bd600a5b567d91670d3af1d761645b4214",
+      "size": 146764,
+      "mtime": 1794198793723.6335,
+      "relativePath": "theme-snapshot/runtime.css"
+    },
+    "theme-snapshot/snapshot.json": {
+      "hash": "ea6f4d92a3af2408ed2ca534437ae82c1c698774e452a6189ae5cbf169b1d63d",
+      "size": 146,
+      "mtime": 1794198793724.0442,
+      "relativePath": "theme-snapshot/snapshot.json"
+    },
+    "theme-snapshot/snippets.css": {
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "mtime": 1794198793720.8882,
+      "relativePath": "theme-snapshot/snippets.css"
+    },
+    "theme-snapshot/theme.css": {
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "mtime": 1794198793720.6174,
+      "relativePath": "theme-snapshot/theme.css"
+    },
+    "theme-snapshot/vars.css": {
+      "hash": "8f63d191f675bc7751511218124793eca2dda16ef92b9f8c277f9e5143004d7e",
+      "size": 31,
+      "mtime": 1794198793721.2732,
+      "relativePath": "theme-snapshot/vars.css"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-share",
 	"version": "26.11.1",
-	"description": "MDFriday Share \u2014 publish a single note as a public link. Desktop.",
+	"description": "MDFriday Share — publish a single note as a public link. Desktop.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
@@ -22,7 +22,9 @@
 		"build:smoke": "npm run build:staging && npm run sync:smoke-vault",
 		"open:smoke-vault": "node scripts/open-smoke-vault.mjs",
 		"test:e2e": "node --test --test-timeout=300000 tests/e2e/*.test.ts",
-		"test:e2e:staging": "npm run build:smoke && MDF_E2E_ENV=staging npm run test:e2e"
+		"test:e2e:staging": "npm run build:smoke && MDF_E2E_ENV=staging npm run test:e2e",
+		"test:e2e:ui:password": "node --test --test-timeout=480000 --experimental-strip-types tests/e2e/ui/01-ui-password-journey.test.ts",
+		"test:e2e:password": "npm run build:smoke && MDF_E2E_ENV=staging npm run test:e2e && MDF_E2E_ENV=staging npm run test:e2e:ui:password"
 	},
 	"keywords": [
 		"mdfriday",
@@ -45,6 +47,7 @@
 		"events": "^3.3.0",
 		"globals": "^17.7.0",
 		"obsidian": "^1.8.7",
+		"playwright": "^1.65.0",
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.3.3",
 		"svelte-preprocess": "^6.0.3",

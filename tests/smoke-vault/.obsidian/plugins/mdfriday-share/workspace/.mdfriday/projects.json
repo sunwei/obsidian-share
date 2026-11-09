@@ -9,6 +9,24 @@
       "createdAt": 1793932229297,
       "updatedAt": 1793932287304,
       "status": "active"
+    },
+    {
+      "id": "ui-password-note-mw8ppr2n",
+      "name": "ui-password-note",
+      "path": "ui-password-note",
+      "absolutePath": "/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/.obsidian/plugins/mdfriday-share/workspace/projects/ui-password-note",
+      "createdAt": 1794195566165,
+      "updatedAt": 1794195574669,
+      "status": "active"
+    },
+    {
+      "id": "ui-password-share-e2e-mw8psuc9-z3fqr3-mw8pswio",
+      "name": "ui-password-share-e2e-mw8psuc9-z3fqr3",
+      "path": "ui-password-share-e2e-mw8psuc9-z3fqr3",
+      "absolutePath": "/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/.obsidian/plugins/mdfriday-share/workspace/projects/ui-password-share-e2e-mw8psuc9-z3fqr3",
+      "createdAt": 1794195713188,
+      "updatedAt": 1794198799371,
+      "status": "active"
     }
   ]
 }

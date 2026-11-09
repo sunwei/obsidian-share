@@ -260,7 +260,12 @@ export class SharePluginDriver {
 		}
 	}
 
-	async createNoteProject(name: string, vaultRelPath: string, theme: CatalogEntry): Promise<PluginSite> {
+	async createNoteProject(
+		name: string,
+		vaultRelPath: string,
+		theme: CatalogEntry,
+		opts: { password?: string } = {},
+	): Promise<PluginSite> {
 		const sourcePath = path.join(this.vaultDir, vaultRelPath);
 		if (!vaultRelPath.endsWith('.md')) throw new Error('Share E2E only supports note (.md) sources');
 		if (!existsSync(sourcePath)) throw new Error(`vault path missing: ${sourcePath}`);
@@ -272,6 +277,7 @@ export class SharePluginDriver {
 		if (!created.success) throw new Error(`createProject: ${created.error}`);
 		if (!theme.packUrl) throw new Error(`theme ${theme.slug} not entitled`);
 		const patch = this.patchFn(theme);
+		const password = (opts.password || '').trim();
 		const initialConfig: Record<string, unknown> = {
 			baseURL: '/',
 			title: name,
@@ -281,12 +287,28 @@ export class SharePluginDriver {
 			taxonomies: { tag: 'tags', category: 'categories' },
 			module: patch.module,
 			markdown: { useInternalRenderer: true },
-			params: { branding: true, ...patch.params },
+			params: {
+				branding: true,
+				...patch.params,
+				...(password ? { password } : {}),
+			},
 			publish: { method: 'cloudflare' },
 		};
 		const set = await this.projectConfig.setAll(this.workspaceDir, name, initialConfig);
 		if (!set.success) throw new Error(`setAll: ${set.error}`);
 		return { name, kind: 'note', sourcePath, vaultRelPath };
+	}
+
+	/** Update params.password on an existing project (empty clears protection). */
+	async setProjectPassword(projectName: string, password: string): Promise<void> {
+		const get = await this.projectConfig.getAll(this.workspaceDir, projectName);
+		if (!get.success || !get.data) throw new Error(`getAll: ${get.error}`);
+		const prev = (get.data.params && typeof get.data.params === 'object'
+			? get.data.params
+			: {}) as Record<string, unknown>;
+		const params = { ...prev, password: password.trim() };
+		const set = await this.projectConfig.set(this.workspaceDir, projectName, 'params', params);
+		if (!set.success) throw new Error(`set password: ${set.error}`);
 	}
 
 	async buildAndPublish(

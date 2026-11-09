@@ -26,15 +26,21 @@ import * as http from 'http';
 import * as path from 'path';
 import * as os from 'os';
 import { createHash } from 'crypto';
-import { resolveSiteBaseUrl } from '../cloudflare-env';
+import { resolveCdnBaseUrl, resolveSiteBaseUrl } from '../cloudflare-env';
 import {
 	collectNoteMediaFiles,
 	isNoteMediaFile,
 	stripUrlQueryHash,
 } from '../media/note-media';
+import { buildEncryptGateHtml, encryptAESGCM } from './encrypt';
 
 function vaultConfigDir(plugin: Plugin): string {
 	return plugin.app.vault.configDir;
+}
+
+function resolveFaithfulEncryptCdn(plugin: Plugin): string {
+	const settings = (plugin as { settings?: Parameters<typeof resolveCdnBaseUrl>[0] }).settings;
+	return settings ? resolveCdnBaseUrl(settings) : 'https://cdn.fsky.top';
 }
 
 export type ThemeSnapshot = {
@@ -76,6 +82,8 @@ export type LocalPreviewResult = {
 export type LocalPreviewOptions = {
 	file: TFile;
 	title?: string;
+	/** When set, AES-GCM gate (same as theme encrypt cap). */
+	password?: string;
 };
 
 export type ThemeClassBundle = {
@@ -1222,7 +1230,21 @@ export async function writeFaithfulPackage(
     Built with <a href="${resolveSiteBaseUrl((plugin as { settings?: Parameters<typeof resolveSiteBaseUrl>[0] }).settings)}" target="_blank" rel="noopener noreferrer">MDFriday</a>
   </footer>`;
 
-	const bodyMain = contentInner;
+	const password = (opts.password || '').trim();
+	let bodyMain = contentInner;
+	let encryptHead = '';
+	if (password) {
+		const encrypted = encryptAESGCM(password, contentInner);
+		const gate = buildEncryptGateHtml({
+			encryptedBase64: encrypted,
+			level: 'page',
+			path: '/',
+			titleZh: '这篇笔记已加密，请输入密码解锁。',
+			cdnOrigin: resolveFaithfulEncryptCdn(plugin),
+		});
+		bodyMain = gate.bodyInner;
+		encryptHead = gate.headExtra;
+	}
 
 	const indexHtmlPath = path.join(absRoot, 'index.html');
 	// Scroll fix: app.css / theme often set html,body { height:100% }
@@ -1282,6 +1304,7 @@ ${snapshot.css.vars}
 }
 
   </style>
+  ${encryptHead}
 </head>
 <body style="overflow: auto; -webkit-user-select: text; -moz-user-select: text; user-select: text;" class="${escapeHtml(themeClassAttr)}">
   ${bodyMain}
@@ -1311,6 +1334,7 @@ export async function buildFaithfulToProject(
 		file,
 		absRoot: publicDir,
 		title: opts.title,
+		password: opts.password,
 	});
 }
 
@@ -1334,6 +1358,7 @@ export async function packageSingleNotePreview(
 		file,
 		absRoot,
 		title: opts.title,
+		password: opts.password,
 	});
 	const server = await startStaticServer(packaged.rootDir);
 	activeServers.push(server);

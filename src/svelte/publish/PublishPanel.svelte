@@ -80,6 +80,12 @@
 	export let onDismissResult: () => void;
 	export let onSelectTarget: ((sourcePath: string) => void | Promise<void>) | undefined = undefined;
 
+	/** Legacy encrypt password (system-generated). Empty = public. */
+	export let sitePassword: string = '';
+	export let onPasswordToggle: (on: boolean) => void = () => {};
+	export let onPasswordRegenerate: () => void = () => {};
+	export let onCopyPassword: () => void = () => {};
+
 	type PanelTab = 'publish' | 'history';
 	type PlanTier = 'guest' | 'free' | 'personal';
 
@@ -98,6 +104,9 @@
 	let targetMenuOpen = false;
 	let targetOptions: TargetOption[] = [];
 	let targetsLoading = false;
+	let passwordOn = false;
+
+	$: passwordOn = !!sitePassword.trim();
 
 	$: kind = (accountEpoch, quotaRevision, (plugin.settings.mdfKeyKind || '').toLowerCase());
 	$: plan = (accountEpoch, quotaRevision, (plugin.settings.mdfKeyPlan || '').toLowerCase());
@@ -144,16 +153,16 @@
 			: 'unpublished') as 'published' | 'unpublished' | 'revoked';
 	$: previewLive = hasPreview && !!previewUrl && !isPreviewBuilding;
 
-	$: projectUsed = (quotaRevision, plugin.settings.mdfProjectCount);
-	$: projectMax =
-		(quotaRevision,
-		plugin.settings.mdfQuotaMaxProjects ??
-			(planTier === 'guest' ? 1 : null));
+	// Share quotas are storage-only (no site-count gate / display).
 	$: storageUsed = (quotaRevision, plugin.settings.mdfStorageBytes);
 	$: storageMax =
 		(quotaRevision,
 		plugin.settings.mdfQuotaStorageBytes ??
-			(planTier === 'guest' ? 5 * 1024 * 1024 : planTier === 'free' ? 50 * 1024 * 1024 : null));
+			(planTier === 'guest'
+				? 100 * 1024 * 1024
+				: planTier === 'free'
+					? 200 * 1024 * 1024
+					: null));
 
 	function formatBytesShort(n: number | null | undefined): string {
 		if (n == null || !Number.isFinite(n)) return '—';
@@ -162,19 +171,9 @@
 		return `${(n / (1024 * 1024)).toFixed(n >= 100 * 1024 * 1024 ? 0 : 1)} MB`;
 	}
 
-	$: projectsLine =
-		projectMax == null
-			? projectUsed != null
-				? t('ui.quota_projects_unlimited').replace('{{used}}', String(projectUsed))
-				: t('ui.quota_projects_unlimited_label')
-			: t('ui.quota_projects')
-					.replace('{{used}}', String(projectUsed ?? 0))
-					.replace('{{max}}', String(projectMax));
-
 	$: storageLine = t('ui.quota_storage')
 		.replace('{{used}}', formatBytesShort(storageUsed ?? 0))
 		.replace('{{max}}', formatBytesShort(storageMax));
-
 	$: bannerPrimary =
 		planTier === 'guest'
 			? t('ui.banner_guest_lead')
@@ -797,7 +796,7 @@
 					<div class="upgrade-banner">
 						<div class="ub-copy">
 							<div class="ub-lead">{bannerPrimary}</div>
-							<div class="ub-meta">{projectsLine} · {storageLine}</div>
+							<div class="ub-meta">{storageLine}</div>
 						</div>
 						<div class="ub-actions">
 							<button type="button" class="link" on:click={openPlans}>{t('ui.view_plans')}</button>
@@ -811,7 +810,41 @@
 					</div>
 				{/if}
 
-				<!-- Advanced site options removed for Share (no title/logo/nav/domain/subscribe). -->
+				{#if hasContent}
+					<div class="section-label">{t('ui.access_password')}</div>
+					<div class="card card-password">
+						<div class="toggle-row">
+							<span class="field-label" style="margin:0;">{t('ui.access_password')}</span>
+							<div
+								class="toggle"
+								class:on={passwordOn}
+								role="switch"
+								aria-checked={passwordOn}
+								tabindex="0"
+								aria-label={t('ui.access_password')}
+								on:click={() => onPasswordToggle(!passwordOn)}
+								on:keydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										onPasswordToggle(!passwordOn);
+									}
+								}}
+							></div>
+						</div>
+						{#if passwordOn}
+							<div class="password-row">
+								<code class="password-value" title={sitePassword}>{sitePassword}</code>
+								<button type="button" class="link" on:click={onCopyPassword}>{t('ui.copy')}</button>
+								<button type="button" class="link" on:click={onPasswordRegenerate}
+									>{t('ui.password_regenerate')}</button
+								>
+							</div>
+						{/if}
+						<p class="helper">
+							{passwordOn ? t('ui.password_helper_on') : t('ui.password_helper')}
+						</p>
+					</div>
+				{/if}
 
 				{#if publishError}
 					<div class="quota-error" class:is-quota={!!publishErrorAction}>

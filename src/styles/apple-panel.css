@@ -1855,6 +1855,30 @@
   margin-bottom: 8px;
 }
 
+.workspace-leaf-content[data-type="MDFriday_Share"] .mdf-apple-panel .card-password .password-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-leaf-content[data-type="MDFriday_Share"] .mdf-apple-panel .card-password .password-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.04em;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--apple-gray-fill, #f2f2f7);
+  color: var(--text-normal);
+  user-select: all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .workspace-leaf-content[data-type="MDFriday_Share"] .mdf-apple-panel .toggle {
   width: 42px;
   height: 26px;

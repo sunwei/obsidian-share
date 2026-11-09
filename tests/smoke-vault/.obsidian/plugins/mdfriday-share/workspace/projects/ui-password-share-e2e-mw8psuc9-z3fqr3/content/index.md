@@ -1,0 +1,1 @@
+/Users/sunwei/github/sunwei/workspace/obsidian-share/tests/smoke-vault/Notes/ui-password-share-e2e-mw8psuc9-z3fqr3.md
