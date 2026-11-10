@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-share",
-	"version": "26.11.1",
+	"version": "26.11.2",
 	"description": "MDFriday Share — publish a single note as a public link. Desktop.",
 	"main": "main.js",
 	"type": "module",
