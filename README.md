@@ -2,13 +2,17 @@
 
 Right-click a single note. Get a public link. No account, no Git.
 
+**[Watch the usage guide on YouTube](https://www.youtube.com/watch?v=07IlBQnyoDM)**
+
+[![MDFriday Share — usage guide](https://img.youtube.com/vi/07IlBQnyoDM/maxresdefault.jpg)](https://www.youtube.com/watch?v=07IlBQnyoDM)
+
 1. Install **MDFriday Share** (desktop).
 2. Right-click a note → Share.
 3. Copy the public URL.
 
 - Website: https://mdfriday.com
 - Help: https://help.mdfriday.com
-- Discord: https://discord.gg/t7FHJ6qNzT
+- X / Twitter: https://x.com/szm_tech — DM for questions, or follow for updates
 
 ## Plans (product)
 
