@@ -237,14 +237,15 @@ export default class FridayPlugin extends Plugin {
 		setMdfridayClientVersion(this.manifest.version);
 		await this.loadSettings();
 
-		// Unified deep link (all MDFriday plugins share action `mdfriday`):
-		//   obsidian://mdfriday?plugin=share&event=auth&ok=1
-		//   obsidian://mdfriday?plugin=share&event=claim&status=ok
-		//   obsidian://mdfriday?plugin=share&event=upgrade&status=ok&plan=personal
+		// Per-plugin action (Obsidian allows one handler per action name):
+		//   obsidian://mdfriday-share?event=auth&ok=1
+		//   obsidian://mdfriday-share?event=claim&status=ok
+		//   obsidian://mdfriday-share?event=upgrade&status=ok&plan=personal
 		this.registerObsidianProtocolHandler(OBSIDIAN_PROTOCOL_ACTION, async (params) => {
 			const pluginTag = (params.plugin || '').trim().toLowerCase();
-			if (pluginTag !== OBSIDIAN_PROTOCOL_PLUGIN) {
-				return; // ignore callbacks meant for publish / garden / others
+			// Action is unique; ignore only if a foreign plugin= tag is present.
+			if (pluginTag && pluginTag !== OBSIDIAN_PROTOCOL_PLUGIN) {
+				return;
 			}
 			const event = params.event || params.action;
 			// Turnstile UI removed in Share — ignore legacy callbacks.

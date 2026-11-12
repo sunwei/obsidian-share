@@ -30,7 +30,7 @@ Share is the free acquisition surface. Digital Garden / site features live in a 
 | Plugin id | `mdfriday-share` |
 | Sidebar view | `MDFriday_Share` |
 | Icon | `dice-1` |
-| Protocol | `obsidian://mdfriday?plugin=share&event=…` |
+| Protocol | `obsidian://mdfriday-share?event=…` |
 | Client header | `obsidian-share/<version>` |
 | Engine | `@mdfriday/core` (`file:../core`) |
 

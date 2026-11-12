@@ -68,13 +68,13 @@
 | Panel brand title | `MDFriday Share` |
 | Sidebar tabs | `发布/Publish` + `历史/History`（同 Publish） |
 | Ribbon / 命令图标 | `dice-1`（一点骰子） |
-| Protocol | **统一** `obsidian://mdfriday?...`，参数 `plugin=share` |
-| Protocol 常量 | `OBSIDIAN_PROTOCOL_ACTION = 'mdfriday'`，`OBSIDIAN_PROTOCOL_PLUGIN = 'share'` |
+| Protocol | **分插件 action** `obsidian://mdfriday-share?event=…`（另有 garden / publish） |
+| Protocol 常量 | `OBSIDIAN_PROTOCOL_ACTION = 'mdfriday-share'`，`OBSIDIAN_PROTOCOL_PLUGIN = 'share'` |
 | Client 头 | `X-MDFriday-Client: obsidian-share/<version>` |
 | 引擎依赖 | `@mdfriday/core` → `file:../core`（**不用** foundry tgz） |
 | 版本起点 | `26.11.0` |
 
-Handler：**要求** `plugin=share`；其它 plugin 标签直接忽略（给 Publish / 未来 Garden 留统一入口）。
+Handler：注册 `mdfriday-share`；若带 `plugin=` 且不是 `share` 则忽略。
 
 ---
 
@@ -147,7 +147,7 @@ Handler：**要求** `plugin=share`；其它 plugin 标签直接忽略（给 Pub
 
 - [x] 持久化并展示 `contentExpiresAt` / `expiresAt`（pathConfigs + 面板「Expires in N days」；无 API 值则不显示、不客户端伪造 7 天）
 - [x] 前端只预警；**服务端 cleanup 为真相**
-- [x] Claim CTA：`openAccountInBrowser` 带 `plugin=share` + `return_protocol=obsidian://mdfriday?plugin=share&…`
+- [x] Claim CTA：`openAccountInBrowser` 带 `plugin=share` + `return_protocol=obsidian://mdfriday-share?…`
 
 ---
 
@@ -166,12 +166,12 @@ Handler：**要求** `plugin=share`；其它 plugin 标签直接忽略（给 Pub
 ## Phase 5 — Website deep links（双 protocol；Publish 不动）
 
 - [x] **Publish 双注册 — 已撤回 / 不做**：`obsidian-publish` 保持仅 `mdfriday-publish`
-- [x] Website Account **临时双 protocol**：
-  - Share（`plugin=share` 或 `return_protocol=obsidian://mdfriday?…`）→ **`obsidian://mdfriday?plugin=share&event=…`**
-  - Publish / 缺省 → **legacy `obsidian://mdfriday-publish?event=…`**
-  - 优先显式 `return_protocol`；次要按钮可试另一套 shape（临时）
-  - 以后 cutover：去掉 legacy，只留 `obsidian://mdfriday`
-- [x] `account-flow.js` / `account.njk` / `guest-challenge.njk`（en+zh）已改；`npm run build:staging` 已重建 public
+- [x] Website Account **分插件 action**（Obsidian 每 action 只能注册一次）：
+  - Share → **`obsidian://mdfriday-share?event=…`**
+  - Garden → **`obsidian://mdfriday-garden?event=…`**
+  - Publish / 缺省 → **`obsidian://mdfriday-publish?event=…`**
+  - 优先显式 `return_protocol`；bare `obsidian://mdfriday?…` 仅作旧 Share 过渡 allowlist
+- [x] `account-flow.js` / `guest-challenge.njk`（en+zh）已按上表改；部署前需重建 / 同步 public
 - [ ] **Website deploy** — **未做**（不依赖 Publish 改动）
 
 ---
